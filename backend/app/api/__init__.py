@@ -1,0 +1,11 @@
+from .health import router as health_router
+from .companies import router as companies_router
+from .brands import router as brands_router
+from .skus import router as skus_router
+from .molecules import router as molecules_router
+from .territories import router as territories_router
+from .secondary_sales import router as secondary_sales_router
+from .reference_prices import router as reference_prices_router
+from .iqvia import router as iqvia_router
+from .budget import router as budget_router
+from .dashboard import router as dashboard_router
