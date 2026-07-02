@@ -4,51 +4,31 @@ from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
 from sqlalchemy import String
 
-from app.db.database import Base
+from app.db.session import Base
 
 
 class CRMVisit(Base):
+
     __tablename__ = "crm_visits"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True,
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
-    visit_date = Column(
-        Date,
-        nullable=False,
-    )
+    visit_date = Column(Date, nullable=False)
 
     territory_id = Column(
         Integer,
         ForeignKey("territories.id"),
-        nullable=False,
     )
 
     sku_id = Column(
         Integer,
         ForeignKey("skus.id"),
-        nullable=True,
     )
 
-    doctor_name = Column(
-        String(200),
-        nullable=True,
-    )
+    doctor_name = Column(String)
 
-    pharmacy_name = Column(
-        String(200),
-        nullable=True,
-    )
+    pharmacy_name = Column(String)
 
-    specialty = Column(
-        String(100),
-        nullable=True,
-    )
+    specialty = Column(String)
 
-    employee = Column(
-        String(150),
-        nullable=False,
-    )
+    employee = Column(String)

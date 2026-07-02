@@ -3,9 +3,9 @@ from .brand import Brand
 from .sku import SKU
 from .molecule import Molecule
 from .territory import Territory
-from .iqvia_sales import IQVIASales
-from .secondary_sales import SecondarySales
-from .reference_price import ReferencePrice
-from .crm_visit import CRMVisit
 from .distributor import Distributor
 from .user import User
+from .secondary_sales import SecondarySales
+from .reference_price import ReferencePrice
+from .iqvia_sales import IQVIASales
+from .crm_visit import CRMVisit

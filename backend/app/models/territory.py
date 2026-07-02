@@ -1,47 +1,22 @@
 from sqlalchemy import Column
-from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
 from sqlalchemy import String
 
-from app.db.database import Base
+from app.db.session import Base
 
 
 class Territory(Base):
+
     __tablename__ = "territories"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True,
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
-    marketing_manager = Column(
-        String(150),
-        nullable=True,
-    )
+    territory_name = Column(String, nullable=False)
 
-    product_manager = Column(
-        String(150),
-        nullable=True,
-    )
+    region = Column(String)
 
-    region = Column(
-        String(100),
-        nullable=False,
-    )
+    brick = Column(String)
 
-    brick = Column(
-        String(100),
-        nullable=True,
-    )
+    marketing_manager = Column(String)
 
-    territory_name = Column(
-        String(150),
-        nullable=False,
-    )
-
-    company_id = Column(
-        Integer,
-        ForeignKey("companies.id"),
-        nullable=True,
-    )
+    product_manager = Column(String)

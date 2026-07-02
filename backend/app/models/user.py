@@ -3,40 +3,21 @@ from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import String
 
-from app.db.database import Base
+from app.db.session import Base
 
 
 class User(Base):
+
     __tablename__ = "users"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True,
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
-    full_name = Column(
-        String(200),
-        nullable=False,
-    )
+    full_name = Column(String, nullable=False)
 
-    email = Column(
-        String(200),
-        unique=True,
-        nullable=False,
-    )
+    email = Column(String, unique=True, nullable=False)
 
-    password_hash = Column(
-        String(255),
-        nullable=False,
-    )
+    password_hash = Column(String, nullable=False)
 
-    role = Column(
-        String(50),
-        nullable=False,
-    )
+    role = Column(String)
 
-    active = Column(
-        Boolean,
-        default=True,
-    )
+    active = Column(Boolean, default=True)

@@ -2,30 +2,15 @@ from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import String
 
-from app.db.database import Base
+from app.db.session import Base
 
 
 class Company(Base):
+
     __tablename__ = "companies"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True,
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
-    name = Column(
-        String(150),
-        unique=True,
-        nullable=False,
-    )
+    name = Column(String, unique=True, nullable=False)
 
-    country = Column(
-        String(100),
-        nullable=True,
-    )
-
-    manufacturer = Column(
-        String(150),
-        nullable=True,
-    )
+    country = Column(String)

@@ -1,64 +1,36 @@
-from sqlalchemy import Boolean
 from sqlalchemy import Column
-from sqlalchemy import Float
 from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
 from sqlalchemy import String
+from sqlalchemy import Float
+from sqlalchemy import Boolean
 
-from app.db.database import Base
+from app.db.session import Base
 
 
 class SKU(Base):
+
     __tablename__ = "skus"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True,
-    )
+    id = Column(Integer, primary_key=True, index=True)
+
+    name = Column(String, nullable=False)
 
     brand_id = Column(
         Integer,
         ForeignKey("brands.id"),
-        nullable=False,
     )
 
-    name = Column(
-        String(200),
-        nullable=False,
-    )
+    dosage = Column(String)
 
-    dosage = Column(
-        String(100),
-        nullable=True,
-    )
+    form = Column(String)
 
-    form = Column(
-        String(100),
-        nullable=True,
-    )
+    pack = Column(String)
 
-    pack = Column(
-        String(100),
-        nullable=True,
-    )
+    manufacturer_price = Column(Float)
 
-    manufacturer_price = Column(
-        Float,
-        nullable=True,
-    )
+    wholesale_price = Column(Float)
 
-    wholesale_price = Column(
-        Float,
-        nullable=True,
-    )
+    retail_price = Column(Float)
 
-    retail_price = Column(
-        Float,
-        nullable=True,
-    )
-
-    active = Column(
-        Boolean,
-        default=True,
-    )
+    active = Column(Boolean, default=True)
