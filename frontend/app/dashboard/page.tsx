@@ -7,16 +7,35 @@ import KPICard from "@/components/cards/KPICard";
 import SalesLineChart from "@/components/charts/SalesLineChart";
 import MarketShareCard from "@/components/cards/MarketShareCard";
 import TopBrandsTable from "@/components/tables/TopBrandsTable";
+import { DashboardData, fetchDashboardData } from "./lib/api";
+
+const currencyFormatter = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+const numberFormatter = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 
 export default function DashboardPage() {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('http://localhost:8000/dashboard')
-      .then(res => res.json())
-      .then(setData)
-      .catch(err => console.error(err));
+    fetchDashboardData()
+      .then((dashboard) => {
+        setData(dashboard);
+        setError(null);
+      })
+      .catch(() => setError("Could not load dashboard data. Make sure the backend is running."))
+      .finally(() => setLoading(false));
   }, []);
+
+  const kpis = data?.kpis;
+  const growth = kpis?.growth ?? 0;
 
   return (
     <DashboardLayout>
@@ -25,20 +44,59 @@ export default function DashboardPage() {
           <h1 className="text-5xl font-semibold tracking-tight text-slate-900">
             Market Overview
           </h1>
+          <p className="mt-3 text-slate-500">
+            {data?.metadata.filename
+              ? `Based on ${data.metadata.filename}`
+              : "Upload an IQVIA Excel or CSV file to populate the dashboard"}
+          </p>
         </div>
 
         <FilterBar />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <KPICard title="TOTAL MARKET VALUE" value="$854.5M" change="-13.1%" trend="down" />
-          <KPICard title="TOTAL UNITS" value="364.8M" change="-4.4%" trend="down" />
-          <KPICard title="NOBEL SALES" value="$19.24M" change="+29.3%" trend="up" />
-          <KPICard title="MARKET SHARE" value="1.96%" change="+0.22pp" trend="up" />
-        </div>
+        {error && (
+          <div className="rounded-2xl border border-rose-100 bg-rose-50 p-5 text-rose-700">
+            {error}
+          </div>
+        )}
 
-        <SalesLineChart />
-        <MarketShareCard />
-        <TopBrandsTable />
+        {loading ? (
+          <div className="rounded-3xl border border-slate-100 bg-white p-8 text-slate-500 shadow-sm">
+            Loading dashboard data...
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <KPICard
+                title="TOTAL MARKET VALUE"
+                value={`$${currencyFormatter.format(kpis?.total_market_value ?? 0)}`}
+                change={`${growth >= 0 ? "+" : ""}${growth}%`}
+                trend={growth >= 0 ? "up" : "down"}
+              />
+              <KPICard
+                title="TOTAL UNITS"
+                value={numberFormatter.format(kpis?.total_units ?? 0)}
+                change="0%"
+                trend="neutral"
+              />
+              <KPICard
+                title="NOBEL SALES"
+                value={`$${currencyFormatter.format(kpis?.nobel_sales ?? 0)}`}
+                change="from file"
+                trend="neutral"
+              />
+              <KPICard
+                title="MARKET SHARE"
+                value={`${kpis?.market_share ?? 0}%`}
+                change="from file"
+                trend="neutral"
+              />
+            </div>
+
+            <SalesLineChart data={data?.charts.sales_trend ?? []} growth={growth} />
+            <MarketShareCard companies={data?.charts.market_share ?? []} />
+            <TopBrandsTable brands={data?.top_brands ?? []} />
+          </>
+        )}
       </div>
     </DashboardLayout>
   );

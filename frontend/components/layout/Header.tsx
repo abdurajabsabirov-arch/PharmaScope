@@ -3,7 +3,6 @@
 import {
   Bell,
   Globe,
-  Search,
   Settings,
   UserCircle2,
 } from "lucide-react";
@@ -12,19 +11,7 @@ export default function Header() {
   return (
     <header className="flex h-20 items-center justify-between border-b border-slate-200 bg-white px-10">
 
-      {/* Search */}
-      <div className="relative w-96">
-        <Search
-          size={18}
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-        />
-        <input
-          type="text"
-          placeholder="Search market, company, SKU..."
-          onChange={(e) => console.log("Search:", e.target.value)}
-          className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
-        />
-      </div>
+      <div />
 
       {/* Right side */}
       <div className="flex items-center gap-4">

@@ -152,6 +152,7 @@ venv/
 
 # Database
 *.db
+backend/uploads/.dashboard_cache.json
 
 # Environment
 .env

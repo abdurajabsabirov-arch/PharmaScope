@@ -12,6 +12,7 @@ export default function KPICard({
   trend = "neutral",
 }: KPICardProps) {
   const isPositive = trend === "up" || change.startsWith("+");
+  const tone = trend === "neutral" ? "text-slate-500" : isPositive ? "text-emerald-600" : "text-rose-600";
 
   return (
     <div className="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm hover:shadow transition-shadow duration-200">
@@ -26,9 +27,7 @@ export default function KPICard({
         </h2>
       </div>
 
-      <div className={`mt-4 inline-flex items-center gap-1 text-sm font-medium ${
-        isPositive ? "text-emerald-600" : "text-rose-600"
-      }`}>
+      <div className={`mt-4 inline-flex items-center gap-1 text-sm font-medium ${tone}`}>
         <span>{change}</span>
         <span className="text-xs">vs previous period</span>
       </div>

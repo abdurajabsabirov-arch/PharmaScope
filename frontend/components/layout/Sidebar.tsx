@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import Logo from "./Logo";
 
 import {
-  LayoutDashboard,
   BarChart3,
   TrendingUp,
   BrainCircuit,
@@ -14,7 +13,6 @@ import {
 } from "lucide-react";
 
 const menu = [
-  { title: "Executive Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Market Intelligence", href: "/market", icon: BarChart3 },
   { title: "Sales Intelligence", href: "/sales", icon: TrendingUp },
   { title: "AI Intelligence", href: "/ai", icon: BrainCircuit },
