@@ -1,31 +1,36 @@
 "use client";
 
-const skus = [
-  "All SKU",
-  "Pantap 20 mg",
-  "Pantap 40 mg",
-  "Anzibel Lozenges",
-  "Anzibel Spray",
-  "Tylol Hot Lemon",
-  "Tylol Hot Honey",
-  "Tractus Sachet",
-  "UrsoPat 250 mg",
+import dynamic from 'next/dynamic';
+
+const Select = dynamic(() => import('react-select'), { ssr: false });
+
+const options = [
+  { value: "all", label: "All SKU" },
+  { value: "sku001", label: "SKU-001" },
+  { value: "sku002", label: "SKU-002" },
 ];
 
 export default function SKUSelector() {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm font-medium text-slate-600">
-        SKU
-      </span>
-
-      <select className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium shadow-sm hover:border-blue-500">
-        {skus.map((sku) => (
-          <option key={sku} value={sku}>
-            {sku}
-          </option>
-        ))}
-      </select>
+      <span className="text-sm font-medium text-slate-600 whitespace-nowrap">SKU</span>
+      
+      <Select
+        options={options}
+        defaultValue={options[0]}
+        className="w-52"
+        classNamePrefix="select"
+        isSearchable={true}
+        placeholder="Search SKU..."
+        styles={{
+          control: (base) => ({
+            ...base,
+            borderRadius: '16px',
+            borderColor: '#e2e8f0',
+            minHeight: '42px',
+          }),
+        }}
+      />
     </div>
   );
 }

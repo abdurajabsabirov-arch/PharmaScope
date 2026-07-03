@@ -1,31 +1,31 @@
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import File
-from fastapi import Form
-from fastapi import UploadFile
-
-from sqlalchemy.orm import Session
-
-from app.db.dependencies import get_db
-from app.services.import_manager import ImportManager
+from fastapi import APIRouter, UploadFile, File, HTTPException, status
+from pathlib import Path
+from datetime import datetime
 
 router = APIRouter(
     prefix="/upload",
     tags=["Upload"],
 )
 
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
 
 @router.post("/")
 async def upload_file(
-    source: str = Form(...),
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
 ):
+    if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
+        raise HTTPException(status_code=400, detail="Только Excel/CSV")
 
-    result = ImportManager.import_file(
-    source=source,
-    file=file.file,
-    db=db,
-)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_path = UPLOAD_DIR / f"iqvia_{timestamp}_{file.filename}"
 
-    return result
+    with open(file_path, "wb") as buffer:
+        buffer.write(await file.read())
+
+    return {
+        "status": "success",
+        "filename": file.filename,
+        "message": "Файл успешно загружен",
+        "path": str(file_path)
+    }

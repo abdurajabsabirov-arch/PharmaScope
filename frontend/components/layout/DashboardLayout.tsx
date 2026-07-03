@@ -13,22 +13,21 @@ export default function DashboardLayout({
   children,
 }: DashboardLayoutProps) {
   return (
-    <div className="flex h-screen bg-slate-100">
+    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
 
-      {/* Sidebar */}
-
+      {/* Тёмный Sidebar */}
       <Sidebar />
 
-      {/* Main */}
-
+      {/* Основная область */}
       <div className="flex flex-1 flex-col overflow-hidden">
 
         <Header />
 
-        <main className="flex-1 overflow-auto p-8">
-
-          {children}
-
+        {/* Контент */}
+        <main className="flex-1 overflow-auto p-10 bg-[#F8FAFC]">
+          <div className="max-w-[1600px] mx-auto">
+            {children}
+          </div>
         </main>
 
       </div>

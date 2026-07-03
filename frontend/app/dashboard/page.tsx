@@ -1,73 +1,44 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import FilterBar from "@/components/filters/FilterBar";
 import KPICard from "@/components/cards/KPICard";
 import SalesLineChart from "@/components/charts/SalesLineChart";
-import RegionSalesChart from "@/components/charts/RegionSalesChart";
 import MarketShareCard from "@/components/cards/MarketShareCard";
-import AIInsightsCard from "@/components/cards/AIInsightsCard";
 import TopBrandsTable from "@/components/tables/TopBrandsTable";
 
 export default function DashboardPage() {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    fetch('http://localhost:8000/dashboard')
+      .then(res => res.json())
+      .then(setData)
+      .catch(err => console.error(err));
+  }, []);
+
   return (
     <DashboardLayout>
-      <div className="space-y-8">
-
+      <div className="space-y-10">
         <div>
-
-          <h1 className="text-4xl font-bold text-slate-900">
-            Executive Dashboard
+          <h1 className="text-5xl font-semibold tracking-tight text-slate-900">
+            Market Overview
           </h1>
-
-          <p className="mt-2 text-slate-500">
-            AI-powered Pharmaceutical Intelligence Platform
-          </p>
-
         </div>
 
         <FilterBar />
 
-        <div className="grid grid-cols-4 gap-6">
-
-          <KPICard
-            title="Market Size"
-            value="$124.6M"
-            change="+12.4%"
-          />
-
-          <KPICard
-            title="Sales"
-            value="$18.3M"
-            change="+8.2%"
-          />
-
-          <KPICard
-            title="PPG"
-            value="+14.7%"
-            change="+2.3%"
-          />
-
-          <KPICard
-            title="Evolution Index"
-            value="118.4"
-            change="+5.1%"
-          />
-
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <KPICard title="TOTAL MARKET VALUE" value="$854.5M" change="-13.1%" trend="down" />
+          <KPICard title="TOTAL UNITS" value="364.8M" change="-4.4%" trend="down" />
+          <KPICard title="NOBEL SALES" value="$19.24M" change="+29.3%" trend="up" />
+          <KPICard title="MARKET SHARE" value="1.96%" change="+0.22pp" trend="up" />
         </div>
 
         <SalesLineChart />
-
-        <div className="grid grid-cols-2 gap-6">
-
-          <MarketShareCard />
-
-          <RegionSalesChart />
-
-        </div>
-
+        <MarketShareCard />
         <TopBrandsTable />
-
-        <AIInsightsCard />
-
       </div>
     </DashboardLayout>
   );
