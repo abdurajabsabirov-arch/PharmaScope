@@ -15,43 +15,54 @@ const formatter = new Intl.NumberFormat("en-US", {
 
 export default function TopBrandsTable({ brands = [] }: Partial<TopBrandsTableProps>) {
   return (
-    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-      <div className="flex justify-between items-center mb-6">
+    <div className="glass-panel rounded-lg p-5">
+      <div className="mb-5 flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Top Brands</h2>
-          <p className="text-sm text-slate-500">By sales value</p>
+          <h2 className="text-base font-bold text-slate-950">Top Brands</h2>
+          <p className="text-xs text-slate-500">By Market Value (USD)</p>
         </div>
       </div>
 
       {brands.length ? (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 text-left text-sm text-slate-500">
-              <th className="pb-4 font-medium">Brand</th>
-              <th className="pb-4 font-medium">Company</th>
-              <th className="pb-4 font-medium text-right">Sales</th>
-              <th className="pb-4 font-medium text-right">Share</th>
-            </tr>
-          </thead>
-          <tbody>
-            {brands.map((brand) => (
-              <tr
-                key={`${brand.brand}-${brand.company}`}
-                className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition"
-              >
-                <td className="py-4 font-medium text-slate-900">{brand.brand}</td>
-                <td className="py-4 text-slate-600">{brand.company || "-"}</td>
-                <td className="py-4 text-right">
-                  <p className="font-medium">${formatter.format(brand.sales)}</p>
-                  <p className="text-xs text-slate-500">{formatter.format(brand.units ?? 0)} packs</p>
-                </td>
-                <td className="py-4 text-right text-slate-600">{brand.share}%</td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] table-fixed text-xs">
+            <colgroup>
+              <col className="w-9" />
+              <col />
+              <col className="w-28" />
+              <col className="w-20" />
+              <col className="w-20" />
+              <col className="w-14" />
+            </colgroup>
+            <thead>
+              <tr className="border-b border-slate-100 text-left text-slate-500">
+                <th className="pb-3 font-semibold">#</th>
+                <th className="pb-3 font-semibold">Brand</th>
+                <th className="pb-3 font-semibold">Company</th>
+                <th className="pb-3 text-right font-semibold">Value</th>
+                <th className="pb-3 text-right font-semibold">Packs</th>
+                <th className="pb-3 text-right font-semibold">Share</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {brands.slice(0, 10).map((brand, index) => (
+                <tr
+                  key={`${brand.brand}-${brand.company}`}
+                  className="border-b border-slate-100 last:border-0"
+                >
+                  <td className="py-2.5 text-slate-500">{index + 1}.</td>
+                  <td className="truncate py-2.5 pr-2 font-semibold text-slate-800" title={brand.brand}>{brand.brand}</td>
+                  <td className="truncate py-2.5 pr-2 text-slate-600" title={brand.company || "-"}>{brand.company || "-"}</td>
+                  <td className="whitespace-nowrap py-2.5 text-right font-semibold text-slate-800">${formatter.format(brand.sales)}</td>
+                  <td className="whitespace-nowrap py-2.5 text-right text-slate-600">{formatter.format(brand.units ?? 0)}</td>
+                  <td className="whitespace-nowrap py-2.5 text-right text-slate-600">{brand.share}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
-        <div className="flex h-40 items-center justify-center text-slate-500">
+        <div className="flex h-40 items-center justify-center text-sm text-slate-500">
           Upload a file to calculate top brands
         </div>
       )}

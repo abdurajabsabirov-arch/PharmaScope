@@ -10,3 +10,4 @@ from .iqvia import router as iqvia_router
 from .budget import router as budget_router
 from .dashboard import router as dashboard_router
 from .upload import router as upload_router
+from .users import router as users_router

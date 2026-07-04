@@ -14,6 +14,7 @@ from app.api import (
     budget_router,
     dashboard_router,
     upload_router,
+    users_router,
 )
 
 app = FastAPI(
@@ -51,3 +52,4 @@ app.include_router(iqvia_router)
 app.include_router(budget_router)
 app.include_router(dashboard_router)
 app.include_router(upload_router)
+app.include_router(users_router)

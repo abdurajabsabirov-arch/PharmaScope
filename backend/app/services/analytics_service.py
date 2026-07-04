@@ -12,6 +12,8 @@ from zipfile import ZipFile
 import pandas as pd
 from openpyxl import load_workbook
 
+from app.services.file_registry import get_active_upload_entry, get_active_upload_path
+
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 UPLOAD_DIR = BACKEND_DIR / "uploads"
@@ -35,6 +37,10 @@ UNIT_HINTS = ("unit", "qty", "quantity")
 
 
 def get_latest_upload() -> Path | None:
+    active_path = get_active_upload_path()
+    if active_path:
+        return active_path
+
     files = [
         path
         for pattern in ("*.xlsx", "*.xls", "*.csv")
@@ -53,6 +59,7 @@ def get_dashboard_data(
     path = Path(file_path) if file_path else get_latest_upload()
     if not path or not path.exists():
         return _empty_dashboard("No uploaded data file found")
+    active_entry = get_active_upload_entry()
 
     active_filters = _normalize_filters(filters)
     cached = _read_cache(path)
@@ -60,6 +67,7 @@ def get_dashboard_data(
         if cached.get("records"):
             return _build_dashboard_from_records(
                 path=path,
+                country=_country_for_path(path, active_entry),
                 latest_period=cached.get("latest_period"),
                 periods=cached.get("periods", []),
                 records=cached["records"],
@@ -83,6 +91,7 @@ def get_dashboard_data(
         _write_cache(path, cache_payload)
         return _build_dashboard_from_records(
             path=path,
+            country=_country_for_path(path, active_entry),
             latest_period=cache_payload.get("latest_period"),
             periods=cache_payload.get("periods", []),
             records=cache_payload["records"],
@@ -91,6 +100,12 @@ def get_dashboard_data(
 
     _write_cache(path, data)
     return data
+
+
+def _country_for_path(path: Path, entry: dict[str, Any] | None) -> str:
+    if entry and Path(entry.get("path", "")) == path:
+        return str(entry.get("country") or "Uzbekistan")
+    return "Uzbekistan"
 
 
 def _read_cache(path: Path) -> dict[str, Any] | None:
@@ -160,6 +175,8 @@ def _from_iqvia_workbook(path: Path) -> dict[str, Any]:
     brand_units: dict[tuple[str, str], float] = defaultdict(float)
     sku_value: dict[tuple[str, str, str], float] = defaultdict(float)
     sku_units: dict[tuple[str, str, str], float] = defaultdict(float)
+    molecule_value: dict[str, float] = defaultdict(float)
+    molecule_units: dict[str, float] = defaultdict(float)
     region_value: dict[str, float] = defaultdict(float)
     row_count = 0
 
@@ -274,6 +291,8 @@ def _from_iqvia_xlsx(path: Path) -> dict[str, Any]:
     brand_units: dict[tuple[str, str], float] = defaultdict(float)
     sku_value: dict[tuple[str, str, str], float] = defaultdict(float)
     sku_units: dict[tuple[str, str, str], float] = defaultdict(float)
+    molecule_value: dict[str, float] = defaultdict(float)
+    molecule_units: dict[str, float] = defaultdict(float)
     region_value: dict[str, float] = defaultdict(float)
     row_count = 0
     latest_period = None
@@ -659,6 +678,7 @@ def _build_dashboard_payload(
 
 def _build_dashboard_from_records(
     path: Path,
+    country: str,
     latest_period: str | None,
     periods: list[str],
     records: list[dict[str, Any]],
@@ -668,6 +688,13 @@ def _build_dashboard_from_records(
     selected_periods = _selected_periods(periods, latest_period, filters)
     previous_periods = _previous_periods(periods, selected_periods)
     filtered = [record for record in records if _record_matches(record, dimension_filters)]
+    company_context_filters = {
+        key: value
+        for key, value in dimension_filters.items()
+        if key not in {"company", "brand", "sku"}
+    }
+    company_context_records = [record for record in records if _record_matches(record, company_context_filters)]
+    selected_company_names = _split_filter_values(dimension_filters.get("company", ""))
 
     company_value: dict[str, float] = defaultdict(float)
     company_units: dict[str, float] = defaultdict(float)
@@ -675,12 +702,31 @@ def _build_dashboard_from_records(
     brand_units: dict[tuple[str, str], float] = defaultdict(float)
     sku_value: dict[tuple[str, str, str], float] = defaultdict(float)
     sku_units: dict[tuple[str, str, str], float] = defaultdict(float)
+    molecule_value: dict[str, float] = defaultdict(float)
+    molecule_units: dict[str, float] = defaultdict(float)
     region_value: dict[str, float] = defaultdict(float)
     trend_value: dict[str, float] = defaultdict(float)
     trend_units: dict[str, float] = defaultdict(float)
+    new_product_skus: set[str] = set()
     total_market = 0.0
     total_units = 0.0
     previous_market = 0.0
+    context_company_value: dict[str, float] = defaultdict(float)
+    context_company_units: dict[str, float] = defaultdict(float)
+    context_market = 0.0
+
+    for record in company_context_records:
+        values_by_period = record.get("values_by_period") or {}
+        units_by_period = record.get("units_by_period") or {}
+        value = sum(_number(values_by_period.get(period)) for period in selected_periods)
+        units = sum(_number(units_by_period.get(period)) for period in selected_periods)
+        if not value and not units:
+            continue
+
+        company = str(record.get("company") or "Unknown")
+        context_market += value
+        context_company_value[company] += value
+        context_company_units[company] += units
 
     for record in filtered:
         values_by_period = record.get("values_by_period") or {}
@@ -694,7 +740,19 @@ def _build_dashboard_from_records(
         company = str(record.get("company") or "Unknown")
         brand = str(record.get("brand") or "Unknown")
         sku = str(record.get("sku") or "Unknown")
+        molecule = str(record.get("molecule") or "Unknown")
         region = str(record.get("region") or "Unknown")
+        first_active_period = next(
+            (
+                period
+                for period in periods
+                if _number(values_by_period.get(period)) or _number(units_by_period.get(period))
+            ),
+            None,
+        )
+        if first_active_period in selected_periods:
+            new_product_skus.add(sku)
+
         total_market += value
         total_units += units
         company_value[company] += value
@@ -703,6 +761,8 @@ def _build_dashboard_from_records(
         brand_units[(brand, company)] += units
         sku_value[(sku, brand, company)] += value
         sku_units[(sku, brand, company)] += units
+        molecule_value[molecule] += value
+        molecule_units[molecule] += units
         region_value[region] += value
 
         for period in periods:
@@ -725,20 +785,38 @@ def _build_dashboard_from_records(
         if trend_value.get(period) or trend_units.get(period)
     ]
     cagr = _calculate_cagr(trend_value)
+    ranked_context_companies = sorted(context_company_value.items(), key=lambda item: item[1], reverse=True)
+    top_five_company_sales = sum(value for _, value in ranked_context_companies[:5])
+    selected_company_context = None
+    for rank, (company, value) in enumerate(ranked_context_companies, start=1):
+        if not selected_company_names or company.lower() in selected_company_names:
+            selected_company_context = {
+                "company": company,
+                "sales": round(value, 2),
+                "units": round(context_company_units[company]),
+                "share": round(value / context_market * 100, 2) if context_market else 0.0,
+                "rank": rank,
+            }
+            break
 
     return {
         "kpis": {
             "total_market_value": round(total_market, 2),
             "total_units": round(total_units),
+            "average_price": round(total_market / total_units, 2) if total_units else 0.0,
             "top_company_sales": round(top_company_value, 2),
             "market_share": round(market_share, 2),
             "growth": round(growth, 2),
             "evolution_index": round(total_market / previous_market * 100, 2) if previous_market else 0.0,
             "cagr": cagr,
+            "active_companies": len(context_company_value),
+            "market_concentration": round(top_five_company_sales / context_market * 100, 2) if context_market else 0.0,
+            "new_products": len(new_product_skus),
+            "active_molecules": len(molecule_value),
         },
         "charts": {
             "sales_trend": trend,
-            "market_share": _top_items(company_value, total_market, "name"),
+            "market_share": _top_items(context_company_value, context_market, "name"),
             "regions": _top_items(region_value, total_market, "name"),
         },
         "top_brands": [
@@ -755,11 +833,13 @@ def _build_dashboard_from_records(
             {
                 "company": company,
                 "sales": round(value, 2),
-                "units": round(company_units[company]),
-                "share": round(value / total_market * 100, 2) if total_market else 0.0,
+                "units": round(context_company_units[company]),
+                "share": round(value / context_market * 100, 2) if context_market else 0.0,
+                "rank": rank,
             }
-            for company, value in sorted(company_value.items(), key=lambda item: item[1], reverse=True)[:10]
+            for rank, (company, value) in enumerate(ranked_context_companies[:10], start=1)
         ],
+        "selected_company": selected_company_context,
         "top_skus": [
             {
                 "sku": sku,
@@ -771,10 +851,20 @@ def _build_dashboard_from_records(
             }
             for (sku, brand, company), value in sorted(sku_value.items(), key=lambda item: item[1], reverse=True)[:20]
         ],
+        "top_molecules": [
+            {
+                "molecule": molecule,
+                "sales": round(value, 2),
+                "units": round(molecule_units[molecule]),
+                "share": round(value / total_market * 100, 2) if total_market else 0.0,
+            }
+            for molecule, value in sorted(molecule_value.items(), key=lambda item: item[1], reverse=True)[:10]
+        ],
         "filter_options": _build_filter_options(records, dimension_filters),
         "period_options": _build_period_options(periods, latest_period),
         "metadata": {
             "filename": path.name,
+            "country": country,
             "rows": len(filtered),
             "total_rows": len(records),
             "latest_period": latest_period,
@@ -1214,5 +1304,5 @@ def _empty_dashboard(message: str) -> dict[str, Any]:
         },
         "charts": {"sales_trend": [], "market_share": [], "regions": []},
         "top_brands": [],
-        "metadata": {"filename": None, "rows": 0, "latest_period": None, "message": message},
+        "metadata": {"filename": None, "country": "Uzbekistan", "rows": 0, "latest_period": None, "message": message},
     }

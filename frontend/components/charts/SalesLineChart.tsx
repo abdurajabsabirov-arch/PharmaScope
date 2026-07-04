@@ -17,26 +17,26 @@ type SalesLineChartProps = {
 
 export default function SalesLineChart({ data = [], growth = 0 }: Partial<SalesLineChartProps>) {
   return (
-    <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+    <div className="glass-panel rounded-lg p-5">
 
-      <div className="flex justify-between items-start mb-5">
+      <div className="mb-4 flex items-start justify-between">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-slate-900">
-            Market Value Trend
+          <h2 className="text-base font-bold text-slate-950">
+            Market Value Trend (USD)
           </h2>
-          <p className="text-sm text-slate-500 mt-1">
-            Uploaded file trend (Million USD)
+          <p className="mt-1 text-xs text-slate-500">
+            12-month trend
           </p>
         </div>
         <div className="text-right">
-          <p className={`font-medium ${growth >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+          <p className={`text-xs font-bold ${growth >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
             {growth >= 0 ? "+" : ""}
             {growth}% vs previous period
           </p>
         </div>
       </div>
 
-      <div className="h-[280px]">
+      <div className="h-[250px]">
         {data.length ? (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>
@@ -45,12 +45,12 @@ export default function SalesLineChart({ data = [], growth = 0 }: Partial<SalesL
                 dataKey="month"
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: "#64748b", fontSize: 13 }}
+                tick={{ fill: "#64748b", fontSize: 11 }}
               />
               <YAxis
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: "#64748b", fontSize: 13 }}
+                tick={{ fill: "#64748b", fontSize: 11 }}
               />
               <Tooltip
                 contentStyle={{

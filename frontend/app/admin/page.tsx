@@ -1,77 +1,122 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { uploadIQVIAFile } from "@/app/dashboard/lib/api";
-import { useState } from "react";
+import { createUser, fetchUsers, type UserInfo } from "@/app/dashboard/lib/api";
+import { useLanguage } from "@/lib/i18n";
 
 export default function AdminPage() {
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const { isRu } = useLanguage();
+  const [users, setUsers] = useState<UserInfo[]>([]);
+  const [newUser, setNewUser] = useState({ login: "", password: "", role: "user" as "admin" | "user" });
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleUpload = async () => {
-    if (!file) {
-      setError("Choose an Excel or CSV file first.");
-      return;
+  const loadUsers = async () => {
+    try {
+      const response = await fetchUsers();
+      setUsers(response.users ?? []);
+    } catch {
+      setError(isRu ? "Не удалось загрузить пользователей." : "Could not load users.");
     }
+  };
 
-    setUploading(true);
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const handleCreateUser = async () => {
+    setBusy(true);
     setMessage(null);
     setError(null);
 
     try {
-      const response = await uploadIQVIAFile(file);
-      const rows = response.dashboard?.metadata?.rows ?? 0;
-      setMessage(`Uploaded ${response.filename}. Dashboard refreshed from ${rows.toLocaleString()} rows.`);
+      await createUser(newUser);
+      setMessage(isRu ? `Пользователь ${newUser.login} создан.` : `User ${newUser.login} created.`);
+      setNewUser({ login: "", password: "", role: "user" });
+      await loadUsers();
     } catch {
-      setError("Upload failed. Make sure the backend is running and the file format is supported.");
+      setError(isRu ? "Не удалось создать пользователя. Проверьте логин и пароль." : "Could not create user. Login may already exist or password is too short.");
     } finally {
-      setUploading(false);
+      setBusy(false);
     }
   };
 
   return (
     <DashboardLayout>
-      <div className="max-w-2xl mx-auto pt-12">
-        <h1 className="text-4xl font-bold mb-8">Admin Panel</h1>
-
-        <div className="bg-white rounded-3xl p-12 border shadow-sm">
-          <h2 className="text-2xl mb-8">Upload IQVIA File</h2>
-
-          <label className="block border-2 border-dashed border-slate-300 rounded-3xl p-12 text-center cursor-pointer hover:border-blue-400 transition">
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              className="hidden"
-            />
-            <p className="text-lg">Click or drag an Excel/CSV file here</p>
-            <p className="text-sm text-slate-500 mt-2">
-              {file ? file.name : "No file selected"}
-            </p>
-          </label>
-
-          <button
-            onClick={handleUpload}
-            disabled={!file || uploading}
-            className="mt-8 w-full bg-blue-600 text-white py-4 rounded-2xl font-medium hover:bg-blue-700 disabled:opacity-50"
-          >
-            {uploading ? "Uploading..." : "Upload and refresh dashboard"}
-          </button>
-
-          {message && (
-            <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-emerald-700">
-              {message}
-            </div>
-          )}
-
-          {error && (
-            <div className="mt-6 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-rose-700">
-              {error}
-            </div>
-          )}
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">{isRu ? "Администрирование" : "Administration"}</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            {isRu ? "Создание пользователей и назначение ролей доступа." : "Create users and assign access roles."}
+          </p>
         </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900">{isRu ? "Пользователи и роли" : "Users & Roles"}</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {isRu ? "Администраторы управляют файлами и пользователями. Обычные пользователи работают с аналитикой." : "Admins manage files and users. Standard users work with analytics."}
+          </p>
+
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_160px_140px]">
+            <input
+              value={newUser.login}
+              onChange={(event) => setNewUser((current) => ({ ...current, login: event.target.value }))}
+              placeholder={isRu ? "Логин" : "Login"}
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-500"
+            />
+            <input
+              value={newUser.password}
+              onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))}
+              placeholder={isRu ? "Пароль" : "Password"}
+              type="password"
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-500"
+            />
+            <select
+              value={newUser.role}
+              onChange={(event) => setNewUser((current) => ({ ...current, role: event.target.value as "admin" | "user" }))}
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-blue-500"
+            >
+              <option value="user">{isRu ? "Пользователь" : "User"}</option>
+              <option value="admin">{isRu ? "Администратор" : "Admin"}</option>
+            </select>
+            <button
+              onClick={handleCreateUser}
+              disabled={busy || !newUser.login || !newUser.password}
+              className="h-11 rounded-lg bg-slate-900 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isRu ? "Добавить" : "Add user"}
+            </button>
+          </div>
+
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[520px] text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="pb-3">{isRu ? "Логин" : "Login"}</th>
+                  <th className="pb-3">{isRu ? "Роль" : "Role"}</th>
+                  <th className="pb-3">{isRu ? "Создан" : "Created"}</th>
+                  <th className="pb-3">{isRu ? "Статус" : "Status"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((user) => (
+                  <tr key={user.id} className="border-b border-slate-100 last:border-0">
+                    <td className="py-3 font-semibold text-slate-900">{user.login}</td>
+                    <td className="py-3 text-slate-600">{user.role === "admin" && isRu ? "Администратор" : user.role === "user" && isRu ? "Пользователь" : user.role}</td>
+                    <td className="py-3 text-slate-600">{user.created_at ? user.created_at.replace("T", " ") : "-"}</td>
+                    <td className="py-3 text-slate-600">{user.active ? (isRu ? "Активен" : "Active") : (isRu ? "Отключен" : "Disabled")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!users.length && <div className="py-8 text-center text-sm text-slate-500">{isRu ? "Пользователи еще не созданы." : "No users created yet."}</div>}
+          </div>
+        </div>
+
+        {message && <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">{message}</div>}
+        {error && <div className="rounded-xl border border-rose-100 bg-rose-50 p-4 text-sm font-medium text-rose-700">{error}</div>}
       </div>
     </DashboardLayout>
   );

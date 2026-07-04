@@ -2,36 +2,26 @@
 
 import { ReactNode } from "react";
 
-import Sidebar from "./Sidebar";
 import Header from "./Header";
+import Sidebar from "./Sidebar";
 
 interface DashboardLayoutProps {
   children: ReactNode;
+  country?: string;
 }
 
-export default function DashboardLayout({
-  children,
-}: DashboardLayoutProps) {
+export default function DashboardLayout({ children, country }: DashboardLayoutProps) {
   return (
-    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
-
-      {/* Тёмный Sidebar */}
+    <div className="flex h-screen overflow-hidden bg-[#f6f8fc]">
       <Sidebar />
 
-      {/* Основная область */}
       <div className="flex flex-1 flex-col overflow-hidden">
+        <Header country={country} />
 
-        <Header />
-
-        {/* Контент */}
-        <main className="flex-1 overflow-auto p-10 bg-[#F8FAFC]">
-          <div className="max-w-[1600px] mx-auto">
-            {children}
-          </div>
+        <main className="flex-1 overflow-auto bg-[#f6f8fc] p-8">
+          <div className="mx-auto max-w-[1600px]">{children}</div>
         </main>
-
       </div>
-
     </div>
   );
 }
