@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { DashboardData, DashboardFilters } from "@/app/dashboard/lib/api";
+import MultiSelectDropdown, { type FilterOption } from "./MultiSelectDropdown";
 
 type MarketFilterBarProps = {
   filters: DashboardFilters;
@@ -15,6 +15,9 @@ const MULTI_VALUE_SEPARATOR = "|||";
 
 const dimensionFields: Array<{ key: keyof DashboardFilters; label: string }> = [
   { key: "market", label: "Market" },
+  { key: "channel", label: "RX/OTC/FS" },
+  { key: "segment", label: "Segment" },
+  { key: "form", label: "Form" },
   { key: "company", label: "Company" },
   { key: "brand", label: "Brand" },
   { key: "sku", label: "SKU" },
@@ -35,8 +38,8 @@ const hiddenDependencyFields: Record<string, Array<keyof DashboardFilters>> = {
 };
 
 const labelByPeriod: Record<string, string> = {
-  MONTH: "Single Month",
-  MONTHS: "Months",
+  MONTH: "Month",
+  MONTHS: "Multiple Months",
   YTD: "YTD",
   QTR: "Quarter",
   MAT: "MAT",
@@ -58,8 +61,6 @@ export default function MarketFilterBar({
   onChange,
   disabled = false,
 }: MarketFilterBarProps) {
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [isYearOpen, setIsYearOpen] = useState(false);
   const defaults = periodOptions?.default;
   const periodType = filters.period_type ?? defaults?.period_type ?? "MONTH";
   const selectedMonths = (filters.selected_months ?? defaults?.selected_months ?? "")
@@ -68,6 +69,8 @@ export default function MarketFilterBar({
   const selectedYears = (filters.selected_years ?? filters.year ?? defaults?.selected_years ?? defaults?.year ?? "")
     .split(",")
     .filter(Boolean);
+  const allMonthValues = (periodOptions?.months ?? Array.from({ length: 12 }, (_, index) => ({ value: `${index + 1}`.padStart(2, "0"), label: "" })))
+    .map((month) => month.value);
 
   const setFilterValues = (key: keyof DashboardFilters, values: string[]) => {
     const next = { ...filters };
@@ -97,17 +100,6 @@ export default function MarketFilterBar({
     onChange(next);
   };
 
-  const addFilterValue = (key: keyof DashboardFilters, value: string) => {
-    const cleanValue = value.trim();
-    if (!cleanValue) return;
-    setFilterValues(key, [...splitValues(filters[key]), cleanValue]);
-    setDrafts((current) => ({ ...current, [key]: "" }));
-  };
-
-  const updatePeriod = (key: keyof DashboardFilters, value: string) => {
-    onChange({ ...filters, [key]: value });
-  };
-
   const setSelectedYears = (values: string[]) => {
     const nextValues = values.length ? values : [defaults?.year ?? ""].filter(Boolean);
     onChange({
@@ -115,6 +107,49 @@ export default function MarketFilterBar({
       year: nextValues[0],
       selected_years: nextValues.join(","),
     });
+  };
+
+  const updatePeriod = (key: keyof DashboardFilters, value: string) => {
+    const next = { ...filters };
+    if (value) {
+      next[key] = value;
+    } else {
+      delete next[key];
+    }
+    onChange(next);
+  };
+
+  const updateMonthSelection = (values: string[]) => {
+    const uniqueValues = [...new Set(values)].sort();
+    const next: DashboardFilters = {
+      ...filters,
+      year: filters.year ?? defaults?.year,
+      selected_years: filters.selected_years ?? defaults?.selected_years ?? defaults?.year,
+    };
+
+    if (uniqueValues.length === 0) {
+      next.period_type = "MONTH";
+      next.month = "All";
+      delete next.selected_months;
+      delete next.quarter;
+      onChange(next);
+      return;
+    }
+
+    if (uniqueValues.length === 1) {
+      next.period_type = "MONTH";
+      next.month = uniqueValues[0] ?? defaults?.month ?? "";
+      delete next.selected_months;
+      delete next.quarter;
+      onChange(next);
+      return;
+    }
+
+    next.period_type = "MONTHS";
+    next.selected_months = uniqueValues.join(",");
+    delete next.month;
+    delete next.quarter;
+    onChange(next);
   };
 
   const changePeriodType = (value: string) => {
@@ -146,172 +181,91 @@ export default function MarketFilterBar({
     onChange(next);
   };
 
-  const toggleMonth = (month: string) => {
-    const nextMonths = selectedMonths.includes(month)
-      ? selectedMonths.filter((value) => value !== month)
-      : [...selectedMonths, month].sort();
-
-    updatePeriod("selected_months", nextMonths.join(","));
-  };
-
   return (
-    <div id="market-filters" className="glass-panel scroll-mt-8 rounded-lg p-3">
+    <div id="market-filters" className="glass-panel filter-panel scroll-mt-8 rounded-lg p-3">
       <div className="flex flex-wrap gap-2">
-        <label className="flex min-w-[118px] flex-1 flex-col gap-1.5 rounded-md border border-slate-100 bg-white px-3 py-2 shadow-sm">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Period Type</span>
-          <select
-            value={periodType}
-            onChange={(event) => changePeriodType(event.target.value)}
-            disabled={disabled}
-            className="h-9 rounded-lg border border-transparent bg-transparent text-sm font-semibold text-slate-900 outline-none focus:border-blue-500"
-          >
-            {(periodOptions?.period_types ?? ["MONTH", "MONTHS", "YTD", "QTR", "MAT", "FULL_YEAR"]).map((type) => (
-              <option key={type} value={type}>
-                {labelByPeriod[type] ?? type}
-              </option>
-            ))}
-          </select>
-        </label>
+        <MultiSelectDropdown
+          label="Period Type"
+          options={(periodOptions?.period_types ?? ["MONTH", "MONTHS", "YTD", "QTR", "MAT", "FULL_YEAR"]).map((type) => ({
+            value: type,
+            label: labelByPeriod[type] ?? type,
+          }))}
+          selectedValues={[periodType].filter(Boolean)}
+          onCommit={(values) => changePeriodType(values[0] ?? "MONTH")}
+          disabled={disabled}
+          single
+        />
 
-        <label className="flex min-w-[104px] flex-1 flex-col gap-1.5 rounded-md border border-slate-100 bg-white px-3 py-2 shadow-sm">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Year</span>
-          <button
-            type="button"
-            onClick={() => setIsYearOpen((current) => !current)}
-            disabled={disabled}
-            className="h-9 rounded-lg border border-transparent bg-transparent text-left text-sm font-semibold text-slate-900 outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:text-slate-400"
-          >
-            {selectedYears.length > 1 ? `${selectedYears.length} years` : selectedYears[0] ?? "All"}
-          </button>
-          {isYearOpen && (
-            <div className="mt-2 grid gap-1 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
-              {(periodOptions?.years ?? []).map((year) => (
-                <label key={year} className="flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                  <input
-                    type="checkbox"
-                    checked={selectedYears.includes(year)}
-                    onChange={() => {
-                      const nextYears = selectedYears.includes(year)
-                        ? selectedYears.filter((value) => value !== year)
-                        : [...selectedYears, year].sort().reverse();
-                      setSelectedYears(nextYears);
-                    }}
-                    disabled={disabled}
-                  />
-                  <span>{year}</span>
-                </label>
-              ))}
-            </div>
-          )}
-        </label>
+        <MultiSelectDropdown
+          label="Year"
+          options={(periodOptions?.years ?? []).map((year) => ({ value: year, label: year }))}
+          selectedValues={selectedYears}
+          onCommit={(values) => setSelectedYears(values)}
+          disabled={disabled}
+          minWidthClass="min-w-[104px]"
+        />
 
         {(periodType === "MONTH" || periodType === "YTD" || periodType === "MAT") && (
-          <label className="flex min-w-[104px] flex-1 flex-col gap-1.5 rounded-md border border-slate-100 bg-white px-3 py-2 shadow-sm">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              {periodType === "YTD" ? "Through" : "Month"}
-            </span>
-            <select
-              value={filters.month ?? defaults?.month ?? ""}
-              onChange={(event) => updatePeriod("month", event.target.value)}
-              disabled={disabled}
-              className="h-9 rounded-lg border border-transparent bg-transparent text-sm font-semibold text-slate-900 outline-none focus:border-blue-500"
-            >
-              {(periodOptions?.months ?? []).map((month) => (
-                <option key={month.value} value={month.value}>
-                  {month.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <MultiSelectDropdown
+            label={periodType === "YTD" ? "Through" : "Month"}
+            options={(periodOptions?.months ?? []).map((month) => ({ value: month.value, label: month.label }))}
+            selectedValues={periodType === "MONTH"
+              ? (filters.month === "All"
+                ? []
+                : ([filters.month ?? defaults?.month ?? "", ...selectedMonths].filter(Boolean).slice(0, Math.max(1, selectedMonths.length || 1))))
+              : [filters.month ?? defaults?.month ?? ""].filter(Boolean)}
+            onCommit={(values) => periodType === "MONTH"
+              ? updateMonthSelection(values)
+              : updatePeriod("month", values[0] ?? defaults?.month ?? "")}
+            disabled={disabled}
+            single={periodType !== "MONTH"}
+            minWidthClass="min-w-[104px]"
+            allLabel={periodType === "MONTH" ? "All available months" : "All"}
+          />
         )}
 
         {periodType === "QTR" && (
-          <label className="flex min-w-[104px] flex-1 flex-col gap-1.5 rounded-md border border-slate-100 bg-white px-3 py-2 shadow-sm">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Quarter</span>
-            <select
-              value={filters.quarter ?? defaults?.quarter ?? "Q1"}
-              onChange={(event) => updatePeriod("quarter", event.target.value)}
-              disabled={disabled}
-              className="h-9 rounded-lg border border-transparent bg-transparent text-sm font-semibold text-slate-900 outline-none focus:border-blue-500"
-            >
-              {(periodOptions?.quarters ?? ["Q1", "Q2", "Q3", "Q4"]).map((quarter) => (
-                <option key={quarter} value={quarter}>
-                  {quarter}
-                </option>
-              ))}
-            </select>
-          </label>
+          <MultiSelectDropdown
+            label="Quarter"
+            options={(periodOptions?.quarters ?? ["Q1", "Q2", "Q3", "Q4"]).map((quarter) => ({ value: quarter, label: quarter }))}
+            selectedValues={[filters.quarter ?? defaults?.quarter ?? "Q1"].filter(Boolean)}
+            onCommit={(values) => updatePeriod("quarter", values[0] ?? defaults?.quarter ?? "Q1")}
+            disabled={disabled}
+            single
+            minWidthClass="min-w-[104px]"
+          />
+        )}
+
+        {periodType === "MONTHS" && (
+          <MultiSelectDropdown
+            label="Months"
+            options={(periodOptions?.months ?? []).map((month) => ({ value: month.value, label: month.label }))}
+            selectedValues={selectedMonths}
+            onCommit={(values) => updatePeriod("selected_months", (values.length ? values : allMonthValues).sort().join(","))}
+            disabled={disabled}
+            minWidthClass="min-w-[112px]"
+            allLabel="All available months"
+          />
         )}
 
         {dimensionFields.map((field) => {
           const values = options?.[field.key as keyof DashboardData["filter_options"]] ?? [];
           const selected = splitValues(filters[field.key]);
-          const listId = `market-filter-${field.key}`;
+          const fieldOptions: FilterOption[] = values.map((value) => ({ value, label: value }));
 
           return (
-            <div
+            <MultiSelectDropdown
               key={field.key}
-              className="flex min-w-[112px] flex-1 flex-col gap-1.5 rounded-md border border-slate-100 bg-white px-3 py-2 shadow-sm"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{field.label}</span>
-                {selected.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => clearFilter(field.key)}
-                    disabled={disabled}
-                    className="rounded-full px-1.5 text-xs font-bold text-slate-400 hover:bg-slate-100 hover:text-rose-600 disabled:cursor-not-allowed"
-                    aria-label={`Clear ${field.label}`}
-                    title={`Clear ${field.label}`}
-                  >
-                    x
-                  </button>
-                )}
-              </div>
-              <div className="relative">
-                <input
-                  value={drafts[field.key] ?? ""}
-                  list={listId}
-                  onChange={(event) => setDrafts((current) => ({ ...current, [field.key]: event.target.value }))}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      addFilterValue(field.key, event.currentTarget.value);
-                    }
-                  }}
-                  disabled={disabled || values.length === 0}
-                  placeholder={selected.length ? selected.length === 1 ? selected[0] : `${selected.length} selected` : "All"}
-                  className="h-9 w-full rounded-lg border border-transparent bg-transparent pr-2 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-900 focus:border-blue-500 disabled:cursor-not-allowed disabled:text-slate-400"
-                />
-              </div>
-              <datalist id={listId}>
-                {values.map((value) => (
-                  <option key={value} value={value} />
-                ))}
-              </datalist>
-            </div>
+              label={field.label}
+              options={fieldOptions}
+              selectedValues={selected}
+              onCommit={(values) => values.length ? setFilterValues(field.key, values) : clearFilter(field.key)}
+              disabled={disabled || values.length === 0}
+              minWidthClass="min-w-[112px]"
+            />
           );
         })}
       </div>
-
-        {periodType === "MONTHS" && (
-        <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-          {(periodOptions?.months ?? []).map((month) => (
-            <label
-              key={month.value}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700"
-            >
-              <input
-                type="checkbox"
-                checked={selectedMonths.includes(month.value)}
-                onChange={() => toggleMonth(month.value)}
-                disabled={disabled}
-              />
-              <span>{month.label}</span>
-            </label>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { useLanguage } from "@/lib/i18n";
 export default function AdminPage() {
   const { isRu } = useLanguage();
   const [users, setUsers] = useState<UserInfo[]>([]);
-  const [newUser, setNewUser] = useState({ login: "", password: "", role: "user" as "admin" | "user" });
+  const [newUser, setNewUser] = useState({ full_name: "", login: "", password: "", role: "user" as "admin" | "user" });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export default function AdminPage() {
     try {
       await createUser(newUser);
       setMessage(isRu ? `Пользователь ${newUser.login} создан.` : `User ${newUser.login} created.`);
-      setNewUser({ login: "", password: "", role: "user" });
+      setNewUser({ full_name: "", login: "", password: "", role: "user" });
       await loadUsers();
     } catch {
       setError(isRu ? "Не удалось создать пользователя. Проверьте логин и пароль." : "Could not create user. Login may already exist or password is too short.");
@@ -59,7 +59,13 @@ export default function AdminPage() {
             {isRu ? "Администраторы управляют файлами и пользователями. Обычные пользователи работают с аналитикой." : "Admins manage files and users. Standard users work with analytics."}
           </p>
 
-          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_160px_140px]">
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1fr_150px_140px]">
+            <input
+              value={newUser.full_name}
+              onChange={(event) => setNewUser((current) => ({ ...current, full_name: event.target.value }))}
+              placeholder={isRu ? "Имя и фамилия" : "Full name"}
+              className="h-11 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-500"
+            />
             <input
               value={newUser.login}
               onChange={(event) => setNewUser((current) => ({ ...current, login: event.target.value }))}
@@ -94,6 +100,7 @@ export default function AdminPage() {
             <table className="w-full min-w-[520px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="pb-3">{isRu ? "Имя" : "Name"}</th>
                   <th className="pb-3">{isRu ? "Логин" : "Login"}</th>
                   <th className="pb-3">{isRu ? "Роль" : "Role"}</th>
                   <th className="pb-3">{isRu ? "Создан" : "Created"}</th>
@@ -103,6 +110,7 @@ export default function AdminPage() {
               <tbody>
                 {users.map((user) => (
                   <tr key={user.id} className="border-b border-slate-100 last:border-0">
+                    <td className="py-3 font-semibold text-slate-900">{user.full_name ?? user.login}</td>
                     <td className="py-3 font-semibold text-slate-900">{user.login}</td>
                     <td className="py-3 text-slate-600">{user.role === "admin" && isRu ? "Администратор" : user.role === "user" && isRu ? "Пользователь" : user.role}</td>
                     <td className="py-3 text-slate-600">{user.created_at ? user.created_at.replace("T", " ") : "-"}</td>

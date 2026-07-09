@@ -153,6 +153,11 @@ venv/
 # Database
 *.db
 backend/uploads/.dashboard_cache.json
+desktop/dist/
+desktop/build-backend/
+desktop/runtime/node/
+desktop/runtime/pharmascope-backend/
+desktop/runtime/python/
 
 # Environment
 .env

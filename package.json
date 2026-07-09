@@ -1,4 +1,18 @@
 {
+  "scripts": {
+    "dev": "concurrently -k -n backend,frontend -c blue,green \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "serve": "concurrently -k -n backend,frontend -c blue,green \"npm run backend:dev\" \"npm run frontend:start\"",
+    "start:app": "npm run frontend:build && npm run serve",
+    "backend:dev": "npm --prefix backend run dev",
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:start": "npm --prefix frontend run start -- --hostname 127.0.0.1 --port 3000",
+    "frontend:build": "npm --prefix frontend run build",
+    "desktop:dev": "npm --prefix desktop run dev",
+    "desktop:build": "npm --prefix desktop run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
   "dependencies": {
     "recharts": "^3.9.0"
   }

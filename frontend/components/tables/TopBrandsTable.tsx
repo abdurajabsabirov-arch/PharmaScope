@@ -5,6 +5,8 @@ type TopBrandsTableProps = {
     sales: number;
     units?: number;
     share: number;
+    sales_change?: number;
+    share_change?: number;
   }>;
 };
 
@@ -25,14 +27,14 @@ export default function TopBrandsTable({ brands = [] }: Partial<TopBrandsTablePr
 
       {brands.length ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] table-fixed text-xs">
+          <table className="w-full min-w-[500px] table-fixed text-xs">
             <colgroup>
               <col className="w-9" />
               <col />
-              <col className="w-28" />
+              <col className="w-24" />
+              <col className="w-24" />
+              <col className="w-16" />
               <col className="w-20" />
-              <col className="w-20" />
-              <col className="w-14" />
             </colgroup>
             <thead>
               <tr className="border-b border-slate-100 text-left text-slate-500">
@@ -53,9 +55,15 @@ export default function TopBrandsTable({ brands = [] }: Partial<TopBrandsTablePr
                   <td className="py-2.5 text-slate-500">{index + 1}.</td>
                   <td className="truncate py-2.5 pr-2 font-semibold text-slate-800" title={brand.brand}>{brand.brand}</td>
                   <td className="truncate py-2.5 pr-2 text-slate-600" title={brand.company || "-"}>{brand.company || "-"}</td>
-                  <td className="whitespace-nowrap py-2.5 text-right font-semibold text-slate-800">${formatter.format(brand.sales)}</td>
+                  <td className="whitespace-nowrap py-2.5 text-right font-semibold text-slate-800">
+                    ${formatter.format(brand.sales)}
+                    <Delta value={brand.sales_change} suffix="%" />
+                  </td>
                   <td className="whitespace-nowrap py-2.5 text-right text-slate-600">{formatter.format(brand.units ?? 0)}</td>
-                  <td className="whitespace-nowrap py-2.5 text-right text-slate-600">{brand.share}%</td>
+                  <td className="whitespace-nowrap py-2.5 text-right text-slate-600">
+                    {brand.share}%
+                    <Delta value={brand.share_change} suffix=" pp" />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -68,4 +76,11 @@ export default function TopBrandsTable({ brands = [] }: Partial<TopBrandsTablePr
       )}
     </div>
   );
+}
+
+function Delta({ value = 0, suffix }: { value?: number; suffix: string }) {
+  const rounded = Math.round(value * 10) / 10;
+  const tone = rounded > 0 ? "text-emerald-600" : rounded < 0 ? "text-rose-600" : "text-amber-500";
+  const symbol = rounded > 0 ? "↗" : rounded < 0 ? "↘" : "≈";
+  return <div className={`text-[10px] font-semibold ${tone}`}>{symbol} {rounded > 0 ? "+" : ""}{rounded}{suffix}</div>;
 }

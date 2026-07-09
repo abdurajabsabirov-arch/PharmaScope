@@ -141,6 +141,22 @@
   }
 }
 
+@keyframes insight-card-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.insight-card-fade {
+  opacity: 0;
+  animation: insight-card-fade 420ms ease-out forwards;
+}
+
 .pulse-marquee {
   display: inline-block;
   min-width: max-content;
@@ -177,8 +193,32 @@
   transform: translateX(120%);
 }
 
+.filter-panel {
+  overflow: visible;
+  z-index: 30;
+}
+
+.dropdown-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 70%) transparent;
+}
+
+.dropdown-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dropdown-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgb(148 163 184 / 70%);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pulse-marquee {
+    animation: none;
+  }
+
+  .insight-card-fade {
+    opacity: 1;
     animation: none;
   }
 }

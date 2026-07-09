@@ -1,0 +1,110 @@
+{
+  "name": "pharmascope-desktop",
+  "version": "0.1.0",
+  "description": "PharmaScope Windows desktop demo shell",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "dev": "cross-env PHARMASCOPE_DESKTOP_DEV=1 electron .",
+    "build": "npm run build:frontend && electron-builder --win",
+    "build:frontend": "npm --prefix ../frontend run build",
+    "pack": "npm run build:frontend && electron-builder --win --dir"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2",
+    "wait-on": "^9.0.3"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0",
+    "electron": "^39.2.7",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "local.pharmascope.demo",
+    "productName": "PharmaScope",
+    "copyright": "Copyright © 2026 PharmaScope",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../frontend/.next/standalone/frontend",
+        "to": "frontend",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../frontend/.next/standalone/frontend/node_modules",
+        "to": "frontend/node_modules",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../frontend/.next/static",
+        "to": "frontend/.next/static"
+      },
+      {
+        "from": "../frontend/public",
+        "to": "frontend/public",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!venv/**",
+          "!__pycache__/**",
+          "!uploads/.dashboard_cache.json",
+          "!uploads/.performance_frame_cache.pkl",
+          "!uploads/.performance_frame_cache.json"
+        ]
+      },
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "runtime",
+        "to": "runtime",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "artifactName": "PharmaScope-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PharmaScope"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "abdurajabsabirov-arch",
+        "repo": "PharmaScope"
+      }
+    ]
+  }
+}

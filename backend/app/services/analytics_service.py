@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date
 import json
+import os
 from pathlib import Path
 import re
 from typing import Any
@@ -15,11 +16,14 @@ from openpyxl import load_workbook
 from app.services.file_registry import get_active_upload_entry, get_active_upload_path
 
 
-BACKEND_DIR = Path(__file__).resolve().parents[2]
+BACKEND_DIR = Path(os.environ.get("PHARMASCOPE_BACKEND_DIR", Path(__file__).resolve().parents[2]))
 UPLOAD_DIR = BACKEND_DIR / "uploads"
 CACHE_FILE = UPLOAD_DIR / ".dashboard_cache.json"
-CACHE_VERSION = 3
+CACHE_VERSION = 7
 MULTI_VALUE_SEPARATOR = "|||"
+DRUG_FORM_COLUMN_INDEX = 5
+CHANNEL_COLUMN_INDEX = 13
+SEGMENT_COLUMN_INDEX = 16
 
 MONTH_RE = re.compile(r"^(?P<year>20\d{2})[/-](?P<month>\d{1,2})")
 COMPANY_HINTS = ("corporation", "company", "manufacturer")
@@ -27,7 +31,11 @@ BRAND_HINTS = ("umbrella brand", "brand")
 SKU_HINTS = ("sku", "product")
 REGION_HINTS = ("region", "territory")
 MOLECULE_HINTS = ("molecule",)
-MARKET_HINTS = ("rx/otc", "segment", "market")
+MARKET_HINTS = ("market", "country")
+SEGMENT_HINTS = ("segment", "market segment")
+FORM_HINTS = ("drug form", "form", "dosage form", "pharmaceutical form", "release form")
+GROUP_HINTS = ("group", "группа")
+CHANNEL_HINTS = ("rx/otc", "otc/rx", "food supplement", "supplement", "channel", "status")
 ATC1_HINTS = ("atc1",)
 ATC2_HINTS = ("atc2",)
 ATC3_HINTS = ("atc3",)
@@ -181,6 +189,12 @@ def _from_iqvia_workbook(path: Path) -> dict[str, Any]:
     row_count = 0
 
     latest_period = max([column["period"] for column in value_columns], default=None)
+    record_value_columns = [
+        column for column in value_columns if latest_period and column["period"].year == latest_period.year
+    ]
+    record_unit_columns = [
+        column for column in unit_columns if latest_period and column["period"].year == latest_period.year
+    ]
     latest_value_indices = [column["index"] for column in value_columns if column["period"] == latest_period]
     latest_unit_indices = [column["index"] for column in unit_columns if column["period"] == latest_period]
     data_start_row = header_row_number + 3
@@ -438,6 +452,10 @@ def _from_iqvia_xlsx_fast(path: Path) -> dict[str, Any]:
     region_idx = _find_column(tuple(header), REGION_HINTS)
     molecule_idx = _find_column(tuple(header), MOLECULE_HINTS)
     market_idx = _find_column(tuple(header), MARKET_HINTS)
+    segment_idx = _find_column(tuple(header), SEGMENT_HINTS) or _index_if_present(header, SEGMENT_COLUMN_INDEX)
+    form_idx = _find_column(tuple(header), FORM_HINTS) or _index_if_present(header, DRUG_FORM_COLUMN_INDEX)
+    group_idx = _find_column(tuple(header), GROUP_HINTS)
+    channel_idx = _find_column(tuple(header), CHANNEL_HINTS) or _index_if_present(header, CHANNEL_COLUMN_INDEX)
     atc1_idx = _find_column(tuple(header), ATC1_HINTS)
     atc2_idx = _find_column(tuple(header), ATC2_HINTS)
     atc3_idx = _find_column(tuple(header), ATC3_HINTS)
@@ -457,6 +475,12 @@ def _from_iqvia_xlsx_fast(path: Path) -> dict[str, Any]:
             unit_columns.append({"index": index, "period": period})
 
     latest_period = max([column["period"] for column in value_columns], default=None)
+    record_value_columns = [
+        column for column in value_columns if latest_period and column["period"].year == latest_period.year
+    ]
+    record_unit_columns = [
+        column for column in unit_columns if latest_period and column["period"].year == latest_period.year
+    ]
     latest_value_indices = [column["index"] for column in value_columns if column["period"] == latest_period]
     latest_unit_indices = [column["index"] for column in unit_columns if column["period"] == latest_period]
 
@@ -469,12 +493,16 @@ def _from_iqvia_xlsx_fast(path: Path) -> dict[str, Any]:
             region_idx,
             molecule_idx,
             market_idx,
+            segment_idx,
+            form_idx,
+            group_idx,
+            channel_idx,
             atc1_idx,
             atc2_idx,
             atc3_idx,
             atc4_idx,
             *[column["index"] for column in value_columns],
-            *[column["index"] for column in unit_columns],
+            *[column["index"] for column in record_unit_columns],
         ]
         if index is not None
     }
@@ -504,6 +532,10 @@ def _from_iqvia_xlsx_fast(path: Path) -> dict[str, Any]:
         region = _cell(tuple(row), region_idx) or "Unknown"
         molecule = _cell(tuple(row), molecule_idx) or "Unknown"
         market = _cell(tuple(row), market_idx) or "Unknown"
+        segment = _cell(tuple(row), segment_idx) or market or "Unknown"
+        form = _cell(tuple(row), form_idx) or "Unknown"
+        group = _cell(tuple(row), group_idx) or "Unknown"
+        channel = _cell(tuple(row), channel_idx) or market or "Unknown"
         atc1 = _cell(tuple(row), atc1_idx) or "Unknown"
         atc2 = _cell(tuple(row), atc2_idx) or "Unknown"
         atc3 = _cell(tuple(row), atc3_idx) or "Unknown"
@@ -515,9 +547,14 @@ def _from_iqvia_xlsx_fast(path: Path) -> dict[str, Any]:
             for column in value_columns
             if _number(_row_value(row, column["index"]))
         }
+        values_by_year: dict[str, float] = defaultdict(float)
+        for column in value_columns:
+            amount = _number(_row_value(row, column["index"]))
+            if amount:
+                values_by_year[str(column["period"].year)] += amount
         units_by_period_for_row = {
             column["period"].strftime("%Y-%m"): round(_number(_row_value(row, column["index"])))
-            for column in unit_columns
+            for column in record_unit_columns
             if _number(_row_value(row, column["index"]))
         }
 
@@ -525,7 +562,7 @@ def _from_iqvia_xlsx_fast(path: Path) -> dict[str, Any]:
             value_by_period[latest_period] += latest_value
             units_by_period[latest_period] += latest_units
 
-        if latest_value:
+        if values_by_period or units_by_period_for_row:
             company_value[company] += latest_value
             brand_value[(brand, company)] += latest_value
             region_value[region] += latest_value
@@ -537,6 +574,10 @@ def _from_iqvia_xlsx_fast(path: Path) -> dict[str, Any]:
                     "region": region,
                     "molecule": molecule,
                     "market": market,
+                    "segment": segment,
+                    "form": form,
+                    "group": group,
+                    "channel": channel,
                     "atc1": atc1,
                     "atc2": atc2,
                     "atc3": atc3,
@@ -544,6 +585,7 @@ def _from_iqvia_xlsx_fast(path: Path) -> dict[str, Any]:
                     "value": round(latest_value, 2),
                     "units": round(latest_units),
                     "values_by_period": values_by_period,
+                    "values_by_year": {year: round(value, 2) for year, value in values_by_year.items()},
                     "units_by_period": units_by_period_for_row,
                 }
             )
@@ -698,15 +740,24 @@ def _build_dashboard_from_records(
 
     company_value: dict[str, float] = defaultdict(float)
     company_units: dict[str, float] = defaultdict(float)
+    company_previous_value: dict[str, float] = defaultdict(float)
     brand_value: dict[tuple[str, str], float] = defaultdict(float)
     brand_units: dict[tuple[str, str], float] = defaultdict(float)
+    brand_previous_value: dict[tuple[str, str], float] = defaultdict(float)
     sku_value: dict[tuple[str, str, str], float] = defaultdict(float)
     sku_units: dict[tuple[str, str, str], float] = defaultdict(float)
+    sku_previous_value: dict[tuple[str, str, str], float] = defaultdict(float)
     molecule_value: dict[str, float] = defaultdict(float)
     molecule_units: dict[str, float] = defaultdict(float)
+    molecule_previous_value: dict[str, float] = defaultdict(float)
+    atc4_value: dict[str, float] = defaultdict(float)
+    atc4_units: dict[str, float] = defaultdict(float)
+    atc4_previous_value: dict[str, float] = defaultdict(float)
     region_value: dict[str, float] = defaultdict(float)
     trend_value: dict[str, float] = defaultdict(float)
     trend_units: dict[str, float] = defaultdict(float)
+    long_term_value: dict[str, float] = defaultdict(float)
+    long_term_units: dict[str, float] = defaultdict(float)
     new_product_skus: set[str] = set()
     total_market = 0.0
     total_units = 0.0
@@ -731,8 +782,10 @@ def _build_dashboard_from_records(
     for record in filtered:
         values_by_period = record.get("values_by_period") or {}
         units_by_period = record.get("units_by_period") or {}
+        values_by_year = record.get("values_by_year") or {}
         value = sum(_number(values_by_period.get(period)) for period in selected_periods)
         units = sum(_number(units_by_period.get(period)) for period in selected_periods)
+        previous_value = sum(_number(values_by_period.get(period)) for period in previous_periods)
         previous_market += sum(_number(values_by_period.get(period)) for period in previous_periods)
         if not value and not units:
             continue
@@ -741,6 +794,7 @@ def _build_dashboard_from_records(
         brand = str(record.get("brand") or "Unknown")
         sku = str(record.get("sku") or "Unknown")
         molecule = str(record.get("molecule") or "Unknown")
+        atc4 = str(record.get("atc4") or "Unknown")
         region = str(record.get("region") or "Unknown")
         first_active_period = next(
             (
@@ -757,13 +811,26 @@ def _build_dashboard_from_records(
         total_units += units
         company_value[company] += value
         company_units[company] += units
+        company_previous_value[company] += previous_value
         brand_value[(brand, company)] += value
         brand_units[(brand, company)] += units
+        brand_previous_value[(brand, company)] += previous_value
         sku_value[(sku, brand, company)] += value
         sku_units[(sku, brand, company)] += units
+        sku_previous_value[(sku, brand, company)] += previous_value
         molecule_value[molecule] += value
         molecule_units[molecule] += units
+        molecule_previous_value[molecule] += previous_value
+        atc4_value[atc4] += value
+        atc4_units[atc4] += units
+        atc4_previous_value[atc4] += previous_value
         region_value[region] += value
+        for year, year_value in values_by_year.items():
+            long_term_value[str(year)] += _number(year_value)
+        for period_key, period_units in units_by_period.items():
+            period_text = str(period_key)
+            if len(period_text) >= 4 and period_text[:4].isdigit():
+                long_term_units[period_text[:4]] += _number(period_units)
 
         for period in periods:
             period_value = _number(values_by_period.get(period))
@@ -773,7 +840,6 @@ def _build_dashboard_from_records(
                 trend_units[period] += period_units
 
     top_company_value = max(company_value.values(), default=0.0)
-    market_share = (top_company_value / total_market * 100) if total_market else 0.0
     growth = ((total_market - previous_market) / previous_market * 100) if previous_market else 0.0
     trend = [
         {
@@ -784,7 +850,22 @@ def _build_dashboard_from_records(
         for period in periods
         if trend_value.get(period) or trend_units.get(period)
     ]
-    cagr = _calculate_cagr(trend_value)
+    selected_year = (filters.get("year") or (latest_period or "")[:4]).strip()
+    yearly_trend = [
+        {
+            "year": year,
+            "sales": round(value / 1_000_000, 2),
+            "units": round(long_term_units.get(year, 0.0)),
+        }
+        for year, value in sorted(long_term_value.items())
+        if value or long_term_units.get(year)
+    ]
+    monthly_trend = [
+        item
+        for item in trend
+        if not selected_year or item["month"].endswith(selected_year)
+    ]
+    cagr = _calculate_yearly_cagr(long_term_value)
     ranked_context_companies = sorted(context_company_value.items(), key=lambda item: item[1], reverse=True)
     top_five_company_sales = sum(value for _, value in ranked_context_companies[:5])
     selected_company_context = None
@@ -798,14 +879,20 @@ def _build_dashboard_from_records(
                 "rank": rank,
             }
             break
+    kpi_company_sales = selected_company_context["sales"] if selected_company_names and selected_company_context else top_company_value
+    kpi_market_share = (
+        selected_company_context["share"]
+        if selected_company_names and selected_company_context
+        else round(top_company_value / context_market * 100, 2) if context_market else 0.0
+    )
 
     return {
         "kpis": {
             "total_market_value": round(total_market, 2),
             "total_units": round(total_units),
             "average_price": round(total_market / total_units, 2) if total_units else 0.0,
-            "top_company_sales": round(top_company_value, 2),
-            "market_share": round(market_share, 2),
+            "top_company_sales": round(kpi_company_sales, 2),
+            "market_share": round(kpi_market_share, 2),
             "growth": round(growth, 2),
             "evolution_index": round(total_market / previous_market * 100, 2) if previous_market else 0.0,
             "cagr": cagr,
@@ -813,53 +900,32 @@ def _build_dashboard_from_records(
             "market_concentration": round(top_five_company_sales / context_market * 100, 2) if context_market else 0.0,
             "new_products": len(new_product_skus),
             "active_molecules": len(molecule_value),
+            "active_brands": len(brand_value),
+            "active_skus": len(sku_value),
         },
         "charts": {
-            "sales_trend": trend,
+            "sales_trend": monthly_trend,
+            "long_term_trend": yearly_trend,
             "market_share": _top_items(context_company_value, context_market, "name"),
             "regions": _top_items(region_value, total_market, "name"),
         },
-        "top_brands": [
-            {
-                "brand": brand,
-                "company": company,
-                "sales": round(value, 2),
-                "units": round(brand_units[(brand, company)]),
-                "share": round(value / total_market * 100, 2) if total_market else 0.0,
-            }
-            for (brand, company), value in sorted(brand_value.items(), key=lambda item: item[1], reverse=True)[:10]
-        ],
+        "top_brands": _rank_brand_items(brand_value, brand_previous_value, brand_units, total_market, previous_market),
         "top_companies": [
             {
                 "company": company,
                 "sales": round(value, 2),
                 "units": round(context_company_units[company]),
                 "share": round(value / context_market * 100, 2) if context_market else 0.0,
+                "sales_change": _change_percent(value, company_previous_value.get(company, 0.0)),
+                "share_change": _share_change(value, company_previous_value.get(company, 0.0), context_market, previous_market),
                 "rank": rank,
             }
             for rank, (company, value) in enumerate(ranked_context_companies[:10], start=1)
         ],
         "selected_company": selected_company_context,
-        "top_skus": [
-            {
-                "sku": sku,
-                "brand": brand,
-                "company": company,
-                "sales": round(value, 2),
-                "units": round(sku_units[(sku, brand, company)]),
-                "share": round(value / total_market * 100, 2) if total_market else 0.0,
-            }
-            for (sku, brand, company), value in sorted(sku_value.items(), key=lambda item: item[1], reverse=True)[:20]
-        ],
-        "top_molecules": [
-            {
-                "molecule": molecule,
-                "sales": round(value, 2),
-                "units": round(molecule_units[molecule]),
-                "share": round(value / total_market * 100, 2) if total_market else 0.0,
-            }
-            for molecule, value in sorted(molecule_value.items(), key=lambda item: item[1], reverse=True)[:10]
-        ],
+        "top_skus": _rank_sku_items(sku_value, sku_previous_value, sku_units, total_market, previous_market),
+        "top_molecules": _rank_molecule_items(molecule_value, molecule_previous_value, molecule_units, total_market, previous_market),
+        "top_atc4": _rank_named_items("atc4", atc4_value, atc4_previous_value, atc4_units, total_market, previous_market),
         "filter_options": _build_filter_options(records, dimension_filters),
         "period_options": _build_period_options(periods, latest_period),
         "metadata": {
@@ -875,14 +941,140 @@ def _build_dashboard_from_records(
     }
 
 
-FILTER_KEYS = {"company", "brand", "region", "molecule", "sku", "market", "atc1", "atc2", "atc3", "atc4"}
+def _change_percent(current: float, previous: float) -> float:
+    if not previous:
+        return 0.0
+    return round((current - previous) / previous * 100, 2)
+
+
+def _share_change(current: float, previous: float, current_total: float, previous_total: float) -> float:
+    current_share = current / current_total * 100 if current_total else 0.0
+    previous_share = previous / previous_total * 100 if previous_total else 0.0
+    return round(current_share - previous_share, 2)
+
+
+def _rank_brand_items(
+    values: dict[tuple[str, str], float],
+    previous_values: dict[tuple[str, str], float],
+    units: dict[tuple[str, str], float],
+    total: float,
+    previous_total: float,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "brand": brand,
+            "company": company,
+            "sales": round(value, 2),
+            "units": round(units[(brand, company)]),
+            "share": round(value / total * 100, 2) if total else 0.0,
+            "sales_change": _change_percent(value, previous_values.get((brand, company), 0.0)),
+            "share_change": _share_change(value, previous_values.get((brand, company), 0.0), total, previous_total),
+        }
+        for (brand, company), value in sorted(values.items(), key=lambda item: item[1], reverse=True)[:10]
+    ]
+
+
+def _rank_sku_items(
+    values: dict[tuple[str, str, str], float],
+    previous_values: dict[tuple[str, str, str], float],
+    units: dict[tuple[str, str, str], float],
+    total: float,
+    previous_total: float,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "sku": sku,
+            "brand": brand,
+            "company": company,
+            "sales": round(value, 2),
+            "units": round(units[(sku, brand, company)]),
+            "share": round(value / total * 100, 2) if total else 0.0,
+            "sales_change": _change_percent(value, previous_values.get((sku, brand, company), 0.0)),
+            "share_change": _share_change(value, previous_values.get((sku, brand, company), 0.0), total, previous_total),
+        }
+        for (sku, brand, company), value in sorted(values.items(), key=lambda item: item[1], reverse=True)[:20]
+    ]
+
+
+def _rank_molecule_items(
+    values: dict[str, float],
+    previous_values: dict[str, float],
+    units: dict[str, float],
+    total: float,
+    previous_total: float,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "molecule": molecule,
+            "sales": round(value, 2),
+            "units": round(units[molecule]),
+            "share": round(value / total * 100, 2) if total else 0.0,
+            "sales_change": _change_percent(value, previous_values.get(molecule, 0.0)),
+            "share_change": _share_change(value, previous_values.get(molecule, 0.0), total, previous_total),
+        }
+        for molecule, value in sorted(values.items(), key=lambda item: item[1], reverse=True)[:10]
+    ]
+
+
+def _rank_named_items(
+    field_name: str,
+    values: dict[str, float],
+    previous_values: dict[str, float],
+    units: dict[str, float],
+    total: float,
+    previous_total: float,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            field_name: name,
+            "sales": round(value, 2),
+            "units": round(units[name]),
+            "share": round(value / total * 100, 2) if total else 0.0,
+            "sales_change": _change_percent(value, previous_values.get(name, 0.0)),
+            "share_change": _share_change(value, previous_values.get(name, 0.0), total, previous_total),
+        }
+        for name, value in sorted(values.items(), key=lambda item: item[1], reverse=True)[:10]
+    ]
+
+
+FILTER_KEYS = {
+    "company",
+    "brand",
+    "region",
+    "molecule",
+    "sku",
+    "market",
+    "form",
+    "group",
+    "segment",
+    "channel",
+    "atc1",
+    "atc2",
+    "atc3",
+    "atc4",
+}
 PERIOD_KEYS = {"period_type", "year", "selected_years", "month", "selected_months", "quarter"}
 
 
 def _build_filter_options(records: list[dict[str, Any]], filters: dict[str, str]) -> dict[str, list[str]]:
     return {
         key: _unique_options([record for record in records if _record_matches(record, _filters_except(filters, key))], key)
-        for key in ("company", "brand", "region", "molecule", "sku", "market", "atc1", "atc2", "atc3", "atc4")
+        for key in (
+            "company",
+            "brand",
+            "region",
+            "molecule",
+            "sku",
+            "market",
+            "form",
+            "group",
+            "segment",
+            "channel",
+            "atc1",
+            "atc2",
+            "atc3",
+            "atc4",
+        )
     }
 
 
@@ -919,8 +1111,16 @@ def _normalize_filters(filters: dict[str, str | None] | None) -> dict[str, str]:
         if key not in FILTER_KEYS | PERIOD_KEYS:
             continue
         clean_value = str(value or "").strip()
-        if clean_value and clean_value.lower() not in {"all", "all companies", "all brands", "all regions"}:
-            normalized[key] = clean_value
+        if not clean_value:
+            continue
+
+        lowered = clean_value.lower()
+        if lowered in {"all", "all companies", "all brands", "all regions"}:
+            if key in {"month", "quarter"} and lowered == "all":
+                normalized[key] = "All"
+            continue
+
+        normalized[key] = clean_value
     return normalized
 
 
@@ -941,10 +1141,19 @@ def _selected_periods(periods: list[str], latest_period: str | None, filters: di
         for year in (filters.get("selected_years") or str(selected_year)).split(",")
         if year.strip().isdigit()
     ]
-    selected_month = int(filters.get("month") or (latest_period or periods[-1])[5:7])
-    selected_quarter = int(str(filters.get("quarter") or ((selected_month - 1) // 3 + 1)).replace("Q", ""))
+    month_filter = (filters.get("month") or "").strip()
+    month_is_all = month_filter.lower() == "all"
+    if month_filter.isdigit():
+        selected_month = int(month_filter)
+    else:
+        selected_month = int((latest_period or periods[-1])[5:7])
+
+    quarter_raw = str(filters.get("quarter") or ((selected_month - 1) // 3 + 1)).upper().replace("Q", "")
+    selected_quarter = int(quarter_raw) if quarter_raw.isdigit() else ((selected_month - 1) // 3 + 1)
 
     if selected_type == "MONTH":
+        if month_is_all:
+            return [period for period in periods if int(period[:4]) in selected_years]
         targets = {f"{year}-{selected_month:02d}" for year in selected_years}
         return [period for period in periods if period in targets]
 
@@ -983,6 +1192,17 @@ def _selected_periods(periods: list[str], latest_period: str | None, filters: di
 def _previous_periods(periods: list[str], selected_periods: list[str]) -> list[str]:
     if not selected_periods:
         return []
+    period_set = set(periods)
+    previous_year_periods = []
+    for period in selected_periods:
+        year, month = period.split("-")
+        candidate = f"{int(year) - 1:04d}-{month}"
+        if candidate in period_set:
+          previous_year_periods.append(candidate)
+
+    if previous_year_periods:
+        return previous_year_periods
+
     first_index = periods.index(selected_periods[0]) if selected_periods[0] in periods else 0
     length = len(selected_periods)
     start = max(first_index - length, 0)
@@ -1000,6 +1220,18 @@ def _calculate_cagr(trend_value: dict[str, float]) -> float:
     months = max((last_year - first_year) * 12 + (last_month - first_month), 1)
     years = months / 12
     if first_value <= 0 or last_value <= 0 or years <= 0:
+        return 0.0
+    return round(((last_value / first_value) ** (1 / years) - 1) * 100, 2)
+
+
+def _calculate_yearly_cagr(yearly_value: dict[str, float]) -> float:
+    populated = [(int(year), value) for year, value in sorted(yearly_value.items()) if value > 0 and str(year).isdigit()]
+    if len(populated) < 2:
+        return 0.0
+    first_year, first_value = populated[0]
+    last_year, last_value = populated[-1]
+    years = max(last_year - first_year, 1)
+    if first_value <= 0 or last_value <= 0:
         return 0.0
     return round(((last_value / first_value) ** (1 / years) - 1) * 100, 2)
 
@@ -1222,6 +1454,10 @@ def _find_column(header: tuple[Any, ...], hints: tuple[str, ...]) -> int | None:
         if text and any(hint in text for hint in hints):
             return index
     return None
+
+
+def _index_if_present(header: list[Any] | tuple[Any, ...], index: int) -> int | None:
+    return index if 0 <= index < len(header) else None
 
 
 def _parse_period(value: Any) -> date | None:

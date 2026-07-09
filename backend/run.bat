@@ -1,9 +1,24 @@
 @echo off
+setlocal
 
-python -m venv venv
+cd /d "%~dp0"
 
-call venv\Scripts\activate
+where python >nul 2>&1
+if errorlevel 1 (
+  echo Python is required. Install it from https://www.python.org/
+  pause
+  exit /b 1
+)
 
-pip install -r requirements.txt
+if not exist venv\Scripts\python.exe (
+  echo Creating virtual environment...
+  python -m venv venv
+)
 
-uvicorn main:app --reload
+echo Installing backend dependencies...
+call venv\Scripts\pip.exe install -r requirements.txt
+
+echo Starting PharmaScope API at http://127.0.0.1:8000
+call venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+
+endlocal

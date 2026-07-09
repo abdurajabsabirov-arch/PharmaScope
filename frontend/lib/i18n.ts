@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export type Language = "EN" | "RU";
+export type Language = "EN" | "RU" | "UZ";
 
 const STORAGE_KEY = "pharmascope-language";
 
@@ -11,13 +11,13 @@ export function useLanguage() {
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "RU" || stored === "EN") {
+    if (stored === "RU" || stored === "EN" || stored === "UZ") {
       setLanguageState(stored);
     }
 
     const onChange = () => {
       const next = window.localStorage.getItem(STORAGE_KEY);
-      if (next === "RU" || next === "EN") {
+      if (next === "RU" || next === "EN" || next === "UZ") {
         setLanguageState(next);
       }
     };
@@ -32,5 +32,5 @@ export function useLanguage() {
     window.dispatchEvent(new Event("pharmascope-language-change"));
   };
 
-  return { language, setLanguage, isRu: language === "RU" };
+  return { language, setLanguage, isRu: language === "RU", isUz: language === "UZ" };
 }
