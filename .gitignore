@@ -153,6 +153,7 @@ venv/
 # Database
 *.db
 backend/uploads/.dashboard_cache.json
+generated/
 desktop/dist/
 desktop/build-backend/
 desktop/runtime/node/
